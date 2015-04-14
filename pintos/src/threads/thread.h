@@ -89,9 +89,12 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem wait_l;            /* List of waiting elements*/
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+    int64_t wakeup;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -117,9 +120,7 @@ typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
-void thread_unblock (struct thread *);
-
-struct thread *thread_current (void);
+void thread_unblock (struct thread *);struct thread *thread_current (void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
