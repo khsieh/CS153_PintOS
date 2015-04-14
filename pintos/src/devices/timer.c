@@ -95,11 +95,14 @@ timer_sleep (int64_t ticks)
 {
   struct thread * t;
 
+  if(ticks <= 0) return;
+
   ASSERT (intr_get_level () == INTR_ON);
   t = thread_current();
   t -> wakeup = timer_ticks() + ticks;
-  list_push_back(&wait_list, &t -> wait_l);
+  list_insert_ordered(&wait_list, &t -> elem, t->wakeup, NULL);
   
+  thread_block();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
