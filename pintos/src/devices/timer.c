@@ -20,9 +20,12 @@
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
+<<<<<<< HEAD
 /* Ready List */
 //static struct list ready_list;
 
+=======
+>>>>>>> 3ea17bf9dcc92f48257e732a44370c4d893ec156
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
@@ -40,7 +43,10 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+<<<<<<< HEAD
   //list_init(&ready_list);
+=======
+>>>>>>> 3ea17bf9dcc92f48257e732a44370c4d893ec156
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -110,6 +116,7 @@ wake_threads(struct thread *t, void *aux)
 void
 timer_sleep (int64_t ticks) 
 {
+<<<<<<< HEAD
   ASSERT (intr_get_level () == INTR_ON);
   struct thread * t;
   enum intr_level old_state;
@@ -125,6 +132,13 @@ timer_sleep (int64_t ticks)
     list_push_back(&ready_list, &t -> wait_l);*/
   
   intr_set_level(old_state);
+=======
+  int64_t start = timer_ticks ();
+
+  ASSERT (intr_get_level () == INTR_ON);
+  while (timer_elapsed (start) < ticks) 
+    thread_yield ();
+>>>>>>> 3ea17bf9dcc92f48257e732a44370c4d893ec156
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -257,7 +271,8 @@ real_time_sleep (int64_t num, int32_t denom)
   if (ticks > 0)
     {
       /* We're waiting for at least one full timer tick.  Use
-         timer_sleep() because it will yield the CPU to other
+         timer_sleep
+() because it will yield the CPU to other
          processes. */                
       timer_sleep (ticks); 
     }
