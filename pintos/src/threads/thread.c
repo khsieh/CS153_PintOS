@@ -339,22 +339,6 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Checks if a threads needs to wake up */
-static void
-wake_threads(struct thread *t, void *aux)
-{
-  if(t -> status == THREAD_BLOCKED)
-  {
-      if(t -> sleep_ticks > 0)
-      {
-	  t -> sleep_ticks--;
-      }
-      if(t -> sleep_ticks == 0)
-      {
-	  thread_unblock(t);
-      }
-  }
-}
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void

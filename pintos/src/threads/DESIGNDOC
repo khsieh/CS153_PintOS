@@ -9,7 +9,7 @@
 >> Fill in the names and email addresses of your group members.
 
 Dylan De Los Santos <ddelo004@ucr.edu> <861063270>
-FirstName LastName <email@domain.exampl> <SID>
+Kevin Hsieh <email@domain.exampl> <SID>
 
 ---- PRELIMINARIES ----
 
@@ -34,13 +34,24 @@ FirstName LastName <email@domain.exampl> <SID>
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
+first ensures interrupt are enabled
+disables the interrupt level
+then saves the number of ticks to a member variable of the current thread called sleep_ticks
+the thread is then blocked to sleep it and the interrupt level is restored to trigger the interrupt handler
+the interrupt handler sees which threads need waking up and clocks down sleep_ticks to 0
+this signals the thread is finished sleeping so it unblocks the thread
+
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
+
+
 
 ---- SYNCHRONIZATION ----
 
 >> A4: How are race conditions avoided when multiple threads call
 >> timer_sleep() simultaneously?
+
+ready list sets priority for waiting every time block is called
 
 >> A5: How are race conditions avoided when a timer interrupt occurs
 >> during a call to timer_sleep()?
