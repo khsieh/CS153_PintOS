@@ -9,7 +9,7 @@
 >> Fill in the names and email addresses of your group members.
 
 Dylan De Los Santos <ddelo004@ucr.edu> <861063270>
-Kevin Hsieh <email@domain.exampl> <SID>
+Kevin Hsieh <khsie003@ucr.edu> <861054367>
 
 ---- PRELIMINARIES ----
 
@@ -142,4 +142,32 @@ ticks   A   B   C   A   B   C   to run
 >> refine or improve your design?
 
 >> C6: The assignment explains arithmetic for fixed-point math in
->> detail, but it leaves it open to you to
+>> detail, but it leaves it open to you to you to implement it.  Why did you
+>> decide to implement it the way you did?  If you created an
+>> abstraction layer for fixed-point math, that is, an abstract data
+>> type and/or a set of functions or macros to manipulate fixed-point
+>> numbers, why did you do so?  If not, why not?
+
+   	    	   SURVEY QUESTIONS
+				   ================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?n
