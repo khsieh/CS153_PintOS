@@ -37,12 +37,12 @@ thread sleep_ticks - member variable to track the number of ticks each thread mu
 >> A2: Briefly describe what happens in a call to timer_sleep(),
 >> including the effects of the timer interrupt handler.
 
-first ensures interrupt are enabled
-disables the interrupt level
-then saves the number of ticks to a member variable of the current thread called sleep_ticks
-the thread is then blocked to sleep it and the interrupt level is restored to trigger the interrupt handler
-the interrupt handler sees which threads need waking up and clocks down sleep_ticks to 0
-this signals the thread is finished sleeping so it unblocks the thread
+First ensures interrupt are enabled
+Disables the interrupt level
+Then saves the number of ticks to a member variable of the current thread called sleep_ticks
+The thread is then blocked to sleep it and the interrupt level is restored to trigger the interrupt handler
+The interrupt handler sees which threads need waking up and clocks down sleep_ticks to 0
+This signals the thread is finished sleeping so it unblocks the thread
 
 >> A3: What steps are taken to minimize the amount of time spent in
 >> the timer interrupt handler?
@@ -66,8 +66,7 @@ Interrupts are disable while timer_sleep reads through the sleep list. This prev
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
 
-We chose this design because we initially just checked every thread for a positive sleep_ticks and waited for each
-one but that does not account for race conditions so we decided to use a priority list
+We chose this design because we initially just checked every thread for a positive sleep_ticks and waited for each one but that does not account for race conditions so we decided to use a priority list
 
    	   	   PRIORITY SCHEDULING
 		   ===================
@@ -133,9 +132,7 @@ As the lock_release() is called, it will iterate over the wait list of the speci
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
-A race condition may occur if a thread A is donating its priority to a thread B but after the critical section
-thread B is resetting its priority but thread A is not finished reordering the ready list an incorrect order of 
-priority may occur because the priority of B may be changed. My implementation would avoid this by disabling 
+A race condition may occur if a thread A is donating its priority to a thread B but after the critical section thread B is resetting its priority but thread A is not finished reordering the ready list an incorrect order of priority may occur because the priority of B may be changed. My implementation would avoid this by disabling 
 interrupts before donating the priority to act as a lock.
 
 ---- RATIONALE ----
@@ -213,11 +210,15 @@ the quarter.
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
 
+I find that priority scheduling helped me understand more about the locking and unlocking of threads and the concept of priority donation
+
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
+I think that all pointers/materials provided by the TA and the website are helpful, the documentation are very clear and easy to understand. Though I believe that if there are more examples, it would definitely help me understand what each function does more clearly and faster.
+
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
 
->> Any other comments?n
+>> Any other comments?
