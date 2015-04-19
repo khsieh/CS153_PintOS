@@ -29,7 +29,8 @@ Kevin Hsieh <khsie003@ucr.edu> <861054367>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-
+list wait_list - priority list for waiting threads that is sorted by decreasing wait time
+thread sleep_ticks - member variable to track the number of ticks each thread must sleep
 
 ---- ALGORITHMS ----
 
@@ -65,6 +66,9 @@ Interrupts are disable while timer_sleep reads through the sleep list. This prev
 >> A6: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
 
+We chose this design because we initially just checked every thread for a positive sleep_ticks and waited for each
+one but that does not account for race conditions so we decided to use a priority list
+
    	   	   PRIORITY SCHEDULING
 		   ===================
 
@@ -74,11 +78,37 @@ Interrupts are disable while timer_sleep reads through the sleep list. This prev
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-
+thread donate_priority - gets the priority level for a thread A and donates it to B
+thread set_priority - sets the priority for a thread
+thread get_priority - gets the priority for a thread
+list ready_list - priority list to track awaiting threads to allocate cpu time
 
 >> B2: Explain the data structure used to track priority donation.
 >> Use ASCII art to diagram a nested donation.  (Alternately, submit a
 >> .png file.)
+
+I used a linked list to signal awaiting threads and help with priority donation. The list's head is the thread
+with the highest priority and the tail the lowest. We would first lock the thread for head and once it finishes
+running unlock the thread and donate its priority to the next thread in the list so that it can run and this loops
+until finished.
+
+				
+	A.lock_acquire()
+	-----------------------------------------
+	|					|
+	|					|
+	|					|
+	|					|
+	|					|
+	|		---------		|		List
+	|		|	|		|		H -> after running donates priority to L	
+	|		|   L	|		|		X
+	|		|	|		|		Y
+	|		---------		|		Z
+	|					|		T
+	|					|
+	|A.lock_release()			|
+	|----------------------------------------
 
 ---- ALGORITHMS ----
 
@@ -103,10 +133,18 @@ As the lock_release() is called, it will iterate over the wait list of the speci
 >> how your implementation avoids it.  Can you use a lock to avoid
 >> this race?
 
+A race condition may occur if a thread A is donating its priority to a thread B but after the critical section
+thread B is resetting its priority but thread A is not finished reordering the ready list an incorrect order of 
+priority may occur because the priority of B may be changed. My implementation would avoid this by disabling 
+interrupts before donating the priority to act as a lock.
+
 ---- RATIONALE ----
 
 >> B7: Why did you choose this design?  In what ways is it superior to
 >> another design you considered?
+
+We chose this design because it reorders the ready list ensuring lower priority threads get run by donating the 
+priority of the thread before which was higher
 
    	   	    ADVANCED SCHEDULER
 		     (If Attempted)
