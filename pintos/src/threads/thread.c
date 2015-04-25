@@ -1,6 +1,7 @@
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
+
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
@@ -339,6 +340,11 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+void
+donate_priority()
+{
+    struct thread *t = thread_current();
+}
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
@@ -355,7 +361,6 @@ thread_set_priority (int new_priority)
   if(new_priority < cur_priority){
     donate_priority();
   }
-  t->priority = new_priority;
 
   intr_set_level(prev_lvl);
 }
@@ -364,7 +369,10 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+    enum intr_level old_state = intr_disable();
+    int temp = thread_current() -> priority;
+    intr_set_level(old_state);
+    return temp;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -484,6 +492,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  list_init(&donor_list);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -499,6 +509,24 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+static struct thread *
+get_max_priority()
+{
+    thread * t = thread_current();
+    list_elem * temp = list_front(&ready_list);
+    list_elem * i = list_front(&ready_list);
+    while(i != list_end(&ready_list)
+    {
+	if(i -> priority > t -> priority)
+	{
+	    t = i;
+	    temp = i;
+	}
+    }
+	list_remove(temp);
+    return t;
+}
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -510,7 +538,10 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  {
+      return get_highest_priority();
+      //return list_entry (list_pop_front (&ready_list), struct thread, elem)
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -599,3 +630,29 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void thread_yield_priority(void)
+{
+    //Disable Interrupts
+    enum intr_level old_level = intr_disable();
+
+    if ( !list_empty (&ready_list) ) 
+    {
+	struct thread * cur_thd = thread_current ();
+	struct thread * max_rdy_thd = list_entry (list_max (&ready_list, YOUR_PRIORITY_COMP_FUNCTION, NULL), struct thread, elem);
+	if ( max_rdy_thd->priority > cur_thd->priority )
+        {
+	    if ( intr_context () )
+	    {
+		intr_yield_on_return ();
+	    }
+	    else
+	    {
+		thread_yield ();
+	    } 
+        }
+    }
+
+    //Reenable Interrupts
+    intr_set_level (old_level);
+}
