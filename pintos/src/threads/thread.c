@@ -16,6 +16,8 @@
 #include "userprog/process.h"
 #endif
 
+#define MAX_DEPTH 8
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -238,7 +240,7 @@ thread_block (void)
    it may expect that it can atomically unblock a thread and
    update other data. */
 void
-thread_unblock (struct thread *t) 
+thread_unblock (struct thread *t)
 {
   enum intr_level old_level;
 
@@ -343,7 +345,25 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 donate_priority(void)
 {
-    struct thread *t = thread_current();
+  int depth = 0;
+  struct thread *t = thread_current();
+  struct lock *l = t->wait_lock;
+
+  while(depth < MAX_DEPTH)
+  {
+    if(!l)
+      return;
+
+    depth++;
+    
+    if(!l->holder)
+      return;
+    if(l->holder->priority >= t->priority)
+      return;
+    l->holder->priority = t->priority;
+    t = l->holder;
+    l = t->wait_lock;
+  }
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -357,11 +377,11 @@ thread_set_priority (int new_priority)
   struct thread *t = thread_current();
   int cur_priority = t->priority;
   t->base_priority = new_priority;
-  
+  //comapre priority to see if donation is needed
   if(new_priority < cur_priority){
     donate_priority();
   }
-
+  
   intr_set_level(prev_lvl);
 }
 

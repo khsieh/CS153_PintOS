@@ -95,6 +95,7 @@ struct thread
     struct list donor_list;
     struct list_elem donor_elem;
     int base_priority;
+    struct lock* wait_lock;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
