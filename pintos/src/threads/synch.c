@@ -70,7 +70,7 @@ sema_down (struct semaphore *sema)
     {
 	//list_push_back (&sema->waiters, &thread_current ()->elem);
 	
-	int depth = 0;
+	/*int depth = 0;
 	struct thread * current_thread = thread_current();
 	struct lock * current_lock = thread_current() -> wait_lock;
 	
@@ -87,7 +87,7 @@ sema_down (struct semaphore *sema)
 		current_thread = current_lock -> holder;
 		current_lock = current_thread -> wait_lock;
 	    }
-	}
+	    }*/
 	
 	struct thread * t = thread_current();
 	struct list_elem * i = list_begin(&sema -> waiters);
@@ -105,6 +105,7 @@ sema_down (struct semaphore *sema)
 	    thread_block();
 	}
     }
+ 
   sema->value--;
   intr_set_level (old_level);
 }
@@ -274,6 +275,7 @@ lock_acquire (struct lock *lock)
       }	  
   }
 
+  thread_current() -> wait_lock = NULL;
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
 
