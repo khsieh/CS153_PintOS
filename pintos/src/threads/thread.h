@@ -148,5 +148,7 @@ int thread_get_load_avg (void);
 void donate_priority (void);
 void thread_yield_priority (void);
 
+bool priority_comp_func(const struct list_elem*,
+			const struct list_elem*);
 
 #endif /* threads/thread.h */

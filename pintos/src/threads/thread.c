@@ -152,7 +152,7 @@ thread_print_stats (void)
 
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
-   and adds it to the ready queue.  Returns the thread identifier
+   And Adds It to the ready queue.  Returns the thread identifier
    for the new thread, or TID_ERROR if creation fails.
 
    If thread_start() has been called, then the new thread may be
@@ -211,6 +211,10 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  
+  old_level = intr_disable();
+  thread_yield_priority();
+  intr_set_level(old_level);
 
   return tid;
 }
@@ -351,15 +355,18 @@ donate_priority(void)
 
   while(depth < MAX_DEPTH)
   {
-    if(!l)
+    if(!l){
       return;
+    }
 
     depth++;
     
-    if(!l->holder)
+    if(!l->holder){
       return;
-    if(l->holder->priority >= t->priority)
+    }
+    if(l->holder->priority >= t->priority){
       return;
+    }
     l->holder->priority = t->priority;
     t = l->holder;
     l = t->wait_lock;
@@ -381,7 +388,9 @@ thread_set_priority (int new_priority)
   if(new_priority < cur_priority){
     donate_priority();
   }
-  
+  if(cur_priority > thread_current()->priority){
+    thread_yield_priority();
+  }
   intr_set_level(prev_lvl);
 }
 
@@ -561,8 +570,8 @@ next_thread_to_run (void)
     return idle_thread;
   else
   {
-    return get_max_priority();
-    //return list_entry (list_pop_front (&ready_list), struct thread, elem)
+    //return get_max_priority();
+    return list_entry (list_pop_front (&ready_list), struct thread, elem);
   }
 }
 
@@ -651,7 +660,16 @@ allocate_tid (void)
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
-uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+uint32_t thread_stack_ofs = offsetof (struct thread, stack);        
+
+bool priority_comp_func (const struct list_elem *a,
+			 const struct list_elem *b){
+  struct thread *thread_a, *thread_b;
+  thread_a = list_entry(a, struct thread, elem);
+  thread_b = list_entry(b, struct thread, elem);
+  return (thread_a->priority > thread_b->priority);
+}
+
 
 void
 thread_yield_priority (void)
@@ -662,7 +680,7 @@ thread_yield_priority (void)
     if ( !list_empty (&ready_list) ) 
     {
 	struct thread * cur_thd = thread_current ();
-	struct thread * max_rdy_thd = list_entry (list_max (&ready_list, get_max_priority, NULL), struct thread, elem);
+	struct thread * max_rdy_thd = list_entry (list_max (&ready_list, priority_comp_func, NULL), struct thread, elem);
 	if ( max_rdy_thd->priority > cur_thd->priority )
         {
 	    if ( intr_context () )
