@@ -72,14 +72,46 @@ The Unix-like shell generally runs concurrently with the kernal, this gives the 
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+//Information for a file to be accessed from file list
+struct file_info
+{
+	int fid;		//file descriptor
+	struct list_elem;	//element to store in the files
+	struct file * filep;	//pointer to file
+}
+
+//Information for a process
+{
+	pid_t pid:		//process id
+	tid_t parent_id			  //parent id
+	bool is_waited_on		  //checks if parent is waiting on this process
+	int exit_status			  	   //exit status of the process
+	bool is_done				   	  //checks if process is finished
+	struct list_elem child_elem;			   //child list elemt for children list
+}
+
+//additions to thread struct
+struct thread
+{
+	struct list files;	//list of all open files
+	struct list children;	//list of all child processes
+	struct file * to_execute; //file contains executable for process
+	int is_loaded;		  	 //checks loading status of process
+	int fid;			 	  //file descriptor
+}
+
 >> B2: Describe how file descriptors are associated with open files.
 >> Are file descriptors unique within the entire OS or just within a
 >> single process?
+
+File descriptors are unique within a single process because they are only created when a file is opened therefore they signify an open file.  The file descriptors are kept in a list and are created and removed as files are opened and closed respectively. 
 
 ---- ALGORITHMS ----
 
 >> B3: Describe your code for reading and writing user data from the
 >> kernel.
+
+We first check if the fd is valid, then check the fd for a read() or write() and use input_getc() to read from stdin and putbuf() to write to stdout
 
 >> B4: Suppose a system call causes a full page (4,096 bytes) of data
 >> to be copied from user space into the kernel.  What is the least
@@ -88,8 +120,12 @@ The Unix-like shell generally runs concurrently with the kernal, this gives the 
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
+The smallest number of inspections to the page table would be 1 when pagedir_get_page() is not used and the data is stored on a single page.  The greatest number of calls would be 4096 if there are 4096 pages of 1 byte segments. If a system call only copies 2 bytes of data the greatest number of calls would be 2 for 2 pages of 1 byte segments and the least would still be 1.  There is not much room for improvement in these numbers. 
+
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+The wait system call checks if a parents children has finished running. The call returns -1 if the pid is not in the child list and returns the exit status of the child if it is done running and then the child is removed from the child list.  If the child is not done running it sets a wait bit and blocks the parent process until the child is done.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -105,12 +141,16 @@ The Unix-like shell generally runs concurrently with the kernal, this gives the 
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
+We avoid errors by validating all data inside a syscall, including its arguments, call number, and pointer arguments. We validate pointers using pagedir_get_page() and making sure it doesn't return null which ensure that the pointer is a valid address mapped on the page.  When errors are found we free the process and its resources with exit() syscall.  This exits all the children process and closes all files that the process had running currently. For example if a system call is called we first call validate_pointer on the call number then once that validates we can validate the pointers to the adresses located in the arguments.  Then once the system call is valid we can further validate the arguments by performing the validation on the remaining buffer.  
+
 ---- SYNCHRONIZATION ----
 
 >> B7: The "exec" system call returns -1 if loading the new executable
 >> fails, so it cannot return before the new executable has completed
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
+
+In our helper struct we have a variable that is false by  default and when the program finishes the loading of the program, we make the variable true. The parent that called exec() waits for the value to be true. We can use a semaphore to read the variable making sure that the parent returns only after the child process has finished loading.
 
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
@@ -119,16 +159,26 @@ The Unix-like shell generally runs concurrently with the kernal, this gives the 
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+We can create a struct to record the process info of the Child C before executing the child program. Then we update the info right before exiting, so that the Parent P can check for these info as the wait condition.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+We check for the pointer to get the correct location of the memory allocation. We check for the content of each addresses to see if a page fault or invalid system call happens and free it to manage resources.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+Advantage would be that it is fast since the validation of ownership of a given process.
+Disadvantage would be that it can be difficult to figure out each individual file descriptors.
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+We are using the default implementation. If we change it so that tid_t doesn't map to pid_t, then we can possibly implement one process running on multiple threads.
+
 
       	     SURVEY QUESTIONS
        	     ================
