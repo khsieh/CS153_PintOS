@@ -130,6 +130,8 @@ We avoid errors by validating all data inside a syscall, including its arguments
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
+In our helper struct we have a variable that is false by  default and when the program finishes the loading of the program, we make the variable true. The parent that called exec() waits for the value to be true. We can use a semaphore to read the variable making sure that the parent returns only after the child process has finished loading.
+
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
 >> calls wait(C) before C exits?  After C exits?  How do you ensure
@@ -137,10 +139,14 @@ We avoid errors by validating all data inside a syscall, including its arguments
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
 
+We can create a struct to record the process info of the Child C before executing the child program. Then we update the info right before exiting, so that the Parent P can check for these info as the wait condition.
+
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
+
+We check for the pointer to get teh correct location of the memory allocation. We check for the content of each addresses to see if a page fault or invalid system call happens and get rid of the address 
 
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
