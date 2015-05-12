@@ -21,7 +21,7 @@ Dylan De Los Santos  <ddelo004@ucr.edu> <861063270>
 >> text, lecture notes, and course staff.
 
    	 	    ARGUMENT PASSING
-				   ================
+ 		    ================
 
 ---- DATA STRUCTURES ----
 
@@ -29,22 +29,42 @@ Dylan De Los Santos  <ddelo004@ucr.edu> <861063270>
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+struct exec_helper{
+       const char* cmd;		//the array of the command line
+       char* prog_file_name;	//the char string of the program to run
+       bool  pass_args;		//argument passing, true if successfully added onto the stack
+}
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
 >> you arrange for the elements of argv[] to be in the right order?
 >> How do you avoid overflowing the stack page?
 
+First we parese the arguments into array of char*. And in the order of the last argument to the first, we push it onto a stack of char*, so that the command will be at the top of the stack. Then iterating through the array again to get the addresses of the arguments, inserting them into a different stack.
+
+To avoid overflowing we check for each argument's size to make sure they're not over the size of 4bytes before pusing into the stack. 
+
 ---- RATIONALE ----
 
 >> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+strtok() uses a static pointer to store the states. By using a static pointers, there may be potential race condcitions whilst multithreading.
+
+strtok_r() uses non-static pointers and a thrird argument to keep track of the position. The memory allocation is within the caller of the function, which prevents race conditions.
 
 >> A4: In Pintos, the kernel separates commands into a executable name
 >> and arguments.  In Unix-like systems, the shell does this
 >> separation.  Identify at least two advantages of the Unix approach.
 
+One of the advantages of the Unix approach is that it is much safer to let the shell do the parsing of the command and arguments. It's safer because all checks can be done by the shell before the the command reaches the kernal level, therefore simplifies the jobs of the kernal to let the kernal handle more complex jobs.
+
+Another advantage is that it is much faster/simpler to look for the executable commands at the Unix shells, since the Unix shells uses the PATH environment variable to help find each directories faster. This alos reduce the time that the kernal have to spend trying to find the executables to focus on the more complex jobs.
+
+The Unix-like shell generally runs concurrently with the kernal, this gives the advantage of having kernal running background jobs whilst still having the shell running for user's use.
+
    			      SYSTEM CALLS
-					     ============
+ 			      ============
 
 ---- DATA STRUCTURES ----
 
