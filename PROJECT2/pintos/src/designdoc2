@@ -100,10 +100,12 @@ We first check if the fd is valid, then check the fd for a read() or write() and
 >> for a system call that only copies 2 bytes of data?  Is there room
 >> for improvement in these numbers, and how much?
 
-The smallets number of inspections to the page table would be one and the greatest would be 4096 
+The smallest number of inspections to the page table would be 1 when pagedir_get_page() is not used and the data is stored on a single page.  The greatest number of calls would be 4096 if there are 4096 pages of 1 byte segments. If a system call only copies 2 bytes of data the greatest number of calls would be 2 for 2 pages of 1 byte segments and the least would still be 1.  There is not much room for improvement in these numbers. 
 
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
+
+The wait system call checks if a parents children has finished running. The call returns -1 if the pid is not in the child list and returns the exit status of the child if it is done running and then the child is removed from the child list.  If the child is not done running it sets a wait bit and blocks the parent process until the child is done.
 
 >> B6: Any access to user program memory at a user-specified address
 >> can fail due to a bad pointer value.  Such accesses must cause the
@@ -118,6 +120,8 @@ The smallets number of inspections to the page table would be one and the greate
 >> allocated resources (locks, buffers, etc.) are freed?  In a few
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
+
+We avoid errors by validating all data inside a syscall, including its arguments, call number, and pointer arguments. We validate pointers using pagedir_get_page() and making sure it doesn't return null which ensure that the pointer is a valid address mapped on the page.  When errors are found we free the process and its resources with exit() syscall.  This exits all the children process and closes all files that the process had running currently. For example if a system call is called we first call validate_pointer on the call number then once that validates we can validate the pointers to the adresses located in the arguments.  Then once the system call is valid we can further validate the arguments by performing the validation on the remaining buffer.  
 
 ---- SYNCHRONIZATION ----
 
