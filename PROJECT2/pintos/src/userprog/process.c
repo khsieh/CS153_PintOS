@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -88,7 +89,16 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+    //while(1){}
+    struct child_process* cp = get_child_process(child_tid);
+    cp->wait = true;
+    while (!cp->exit)
+    {
+	//
+    }
+    int status = cp->status;
+    remove_child_process(cp);
+    return status;
 }
 
 /* Free the current process's resources. */
@@ -195,7 +205,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char ** argv, int argc);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -221,13 +231,33 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  char * filename;
+  filename = palloc_get_page(0);
+  if(filename == NULL)
+      return TID_ERROR;
+  strlcpy(filename, file_name, PGSIZE);
+  char * temp;
+  char ** argv;
+  int argc = 0;
+  char * token = strtok_r(filename, " ", temp);
+  
+  /*for(token = strtok_r (s, " <>", &save_ptr);  token != NULL;
+      token = strtok_r (NULL, " <>", &save_ptr))
+  {
+      argv = &token;
+      argv++;
+      argc++;
+      }*/
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  //file = filesys_open (file_name);
+  file = filesys_open (filename);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  //palloc_free_page(filename);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -302,7 +332,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, argv, argc))
     goto done;
 
   /* Start address. */
@@ -424,10 +454,59 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+/* Pushes the SIZE bytes in BUF onto the stack in KPAGE, whose
+   page-relative stack pointer is *OFS, and then adjusts *OFS
+   appropriately.  The bytes pushed are rounded to a 32-bit
+   boundary.
+
+   If successful, returns a pointer to the newly pushed object.
+   On failure, returns a null pointer. */
+static void *
+push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
+{
+    size_t padsize = ROUND_UP (size, sizeof (uint32_t));
+  
+    if (*ofs < padsize){
+	return NULL;
+    }
+
+    *ofs -= padsize;
+  
+    memcpy (kpage + *ofs + (padsize - size), buf, size);
+  
+    return kpage + *ofs + (padsize - size);
+}
+
+static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t * upage, void ** esp) 
+{
+    size_t ofs = PGSIZE; //##Used in push!
+    char * const null = NULL; //##Used for pushing nulls
+    char *ptr; //##strtok_r usage
+    //##Probably need some other variables here as well...
+
+    //##Parse and put in command line arguments, push each value
+    //##if any push() returns NULL, return false
+
+    //##push() a null (more precisely &null).
+    //##if push returned NULL, return false
+
+
+    //##Push argv addresses (i.e. for the cmd_line added above) in reverse order
+    //##See the stack example on documentation for what "reversed" means
+    //##Push argc, how can we determine argc?
+    //##Push &null
+    //##Should you check for NULL returns?
+
+    //##Set the stack pointer. IMPORTANT! Make sure you use the right value here...
+    *esp = upage + ofs;
+
+    //##If you made it this far, everything seems good, return true
+}
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char ** argv, int argc) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -437,7 +516,37 @@ setup_stack (void **esp)
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
+      {
         *esp = PHYS_BASE;
+	/*int i = 0;
+	int addresses[argc];
+	while(i < argc)
+	{
+	    esp = &args;
+	    addresses[i] = &esp;
+	    esp++;
+	    args--;
+	    i++;
+	}
+
+	uint32_t * nullptr = NULL;
+	esp = nullptr;
+	esp++;
+	
+	i = 0;
+	while(i < argc)
+	{
+	    esp = addresses[i];
+	    esp++;
+	    i++;
+	}
+	
+	esp = &args;
+	esp++;
+	esp = argc;
+	esp++;
+	esp = NULL;*/
+      }
       else
         palloc_free_page (kpage);
     }
