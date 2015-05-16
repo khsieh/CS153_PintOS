@@ -38,6 +38,8 @@ void check_valid_buffer(void * buffer, unsigned size);
 void
 syscall_init (void) 
 {
+  lock_init(&filesys_lock);
+
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -49,18 +51,98 @@ syscall_handler (struct intr_frame *f UNUSED)
     switch(* (int *) f -> esp)
     {
     case SYS_WRITE:
-    { 
+      { 
 	get_arg(f, &arg[0], 3);
 	check_valid_buffer((void *) arg[1], (unsigned) arg[2]);
 	arg[1] = user_to_kernel_ptr((const void *) arg[1]);
-	f->eax = write(arg[0], (const void *) arg[1],
-		       (unsigned) arg[2]);
+	f->eax = write(arg[0], (const void *) arg[1], (unsigned) arg[2]);
 	break;
-    }
+      }
+    case SYS_READ:
+      {
+	get_arg(f, &arg[0], 3);
+	check_valid_buffer((void *) arg[1], (unsigned) arg[2]);
+	arg[1] = user_to_kernel_ptr((const void *) arg[1]);
+	f->eax = read(arg[0], (void *) arg[1], (unsigned ) arg[2]);
+	break;
+      }
+    case SYS_HALT:
+      {
+	halt();
+	break;
+      }
+    case SYS_EXIT:
+      {
+	get_arg(f,&arg[0],1);
+	exit(arg[0]);
+	break;
+      }
+    case SYS_WAIT:
+      {
+	get_arg(f,&arg[0],1);
+	f->eax=wait(arg[0]);
+	break;
+      }
+    case SYS_EXEC:
+      {
+	get_arg(f, &arg[0],1);
+	arg[0] = user_to_kernel_ptr((const void *) arg[0]);
+	f->eax = exec((const char *) arg[0]);
+	break;
+      }
+    case SYS_OPEN:
+      {
+	get_arg(f, &arg[0], 1);
+	arg[0] = user_to_kernel_ptr((const void *) arg[0]);
+        f->eax = open((const char* ) arg[0]);
+        break;
+      }
+    case SYS_CREATE:
+      {
+	get_arg(f, &arg[0], 2);
+	arg[0] = user_to_kernel_ptr((const void *) arg[0]);
+	f->eax = create((const char *) arg[0], (unsigned) arg[1]);
+	break;
+      }
+    case SYS_REMOVE:
+      {
+	get_arg(f, &arg[0], 1);
+	arg[0] = user_to_kernel_ptr((const void *) arg[0]);
+	f->eax = remove((const char *) arg[0]);
+	break;
+      }
+    case SYS_FILESIZE:
+      {
+	get_arg(f, &arg[0],1);
+	f->eax = filesize(arg[0]);
+	break;
+      }
+    case SYS_SEEK:
+      {
+	get_arg(f, &arg[0], 2);
+	seek(arg[0], (unsigned) arg[1]);
+	break;
+      }
+    case SYS_TELL:
+      {
+	get_arg(f,&arg[0],1);
+	f->eax = tell(arg[0]);
+	break;
+      }
+    case SYS_CLOSE:
+      {
+	get_arg(f,&arg[0],1);
+	close(arg[0]);
+	break;
+      }
     }
 
-  printf ("system call!\n");
-  thread_exit ();
+//printf ("system call!\n");
+//thread_exit ();
+}
+
+void halt (void){
+  shutdown_power_off();
 }
 
 void exit (int status)
@@ -72,6 +154,31 @@ void exit (int status)
     }
     printf ("%s: exit(%d)\n", cur->name, status);
     thread_exit();
+}
+
+pid_t exec (const char *cmd_line)
+{
+  pid_t pid = process_execute (cmd_line);
+  struct child_process* cp = get_child_process(pid);
+  ASSERT(cp);
+  while( cp->load == NOT_LOADED){
+    barrier();
+  }
+  if(cp->load == LOAD_FAIL){
+    return ERROR;
+  }
+  return pid;
+}
+
+int wait (pid_t pid){
+  return process_wait(pid);
+}
+
+bool create (const char *file, unsigned initial_size){
+  lock_acquire(&filesys_lock);
+  bool success = filesys_create(file, initial_size);
+  lock_release(&filesys_lock);
+  return success;
 }
 
 int write(int fd, const void * buffer, unsigned size)
