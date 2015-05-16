@@ -55,12 +55,20 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  char * ptr;
+  file_name = strtok_r(file_name, " ", &ptr);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  if(success)
+      thread_current() -> cp -> load = 0;
+  else
+      thread_current() -> cp -> load = -1;
+
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -205,7 +213,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, char ** argv, int argc);
+static bool setup_stack (void **esp, char * cmd_line);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -231,33 +239,22 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
-  char * filename;
-  filename = palloc_get_page(0);
-  if(filename == NULL)
+  char * cmd_line = NULL;
+  cmd_line = palloc_get_page(0);
+  if(cmd_line == NULL)
       return TID_ERROR;
-  strlcpy(filename, file_name, PGSIZE);
+  strlcpy(cmd_line, file_name, PGSIZE);
   char * temp;
-  char ** argv;
-  int argc = 0;
-  char * token = strtok_r(filename, " ", temp);
-  
-  /*for(token = strtok_r (s, " <>", &save_ptr);  token != NULL;
-      token = strtok_r (NULL, " <>", &save_ptr))
-  {
-      argv = &token;
-      argv++;
-      argc++;
-      }*/
+  char * token = strtok_r(cmd_line, " ", &temp);
 
   /* Open executable file. */
-  //file = filesys_open (file_name);
-  file = filesys_open (filename);
+  file = filesys_open (token);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  //palloc_free_page(filename);
+  palloc_free_page(cmd_line);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -332,7 +329,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, argv, argc))
+  if (!setup_stack (esp, cmd_line))
     goto done;
 
   /* Start address. */
@@ -483,30 +480,67 @@ static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t 
     char * const null = NULL; //##Used for pushing nulls
     char *ptr; //##strtok_r usage
     //##Probably need some other variables here as well...
+    char * arg;
+    int argc = 0;
 
+    char * my_cmd_line = NULL;
+    strlcpy(my_cmd_line, cmd_line, PGSIZE);
+
+    char *rev_args = my_cmd_line, *s = my_cmd_line + strlen(my_cmd_line) - 1;
+    while (rev_args < s) {
+        char tmp = *rev_args;
+        *rev_args++ = *s;
+        *s-- = tmp;
+    }
+
+    char * rev_args_save = rev_args;
+
+    
     //##Parse and put in command line arguments, push each value
+    for(arg = strtok_r (rev_args, " <>", &ptr); arg != NULL;
+	arg = strtok_r (NULL, " <>", &ptr))
+    {
+	argc++;
     //##if any push() returns NULL, return false
+	if(push(kpage, &ofs, arg, strlen(arg)) == NULL)
+	   return false;
+    }
 
     //##push() a null (more precisely &null).
     //##if push returned NULL, return false
-
+    if(push(kpage, &ofs, &null, sizeof(&null)) == NULL)
+       return false;
 
     //##Push argv addresses (i.e. for the cmd_line added above) in reverse order
     //##See the stack example on documentation for what "reversed" means
+    rev_args = rev_args_save;
+    for(arg = strtok_r (rev_args, " <>", &ptr); arg != NULL;
+	arg = strtok_r (NULL, " <>", &ptr))
+    {
+	if(push(kpage, &ofs, arg, strlen(arg)) == NULL)
+	    return false;
+    }
+
     //##Push argc, how can we determine argc?
+    if(push(kpage, &ofs, &argc, sizeof(argc)) == NULL)
+	return false;
+    
     //##Push &null
     //##Should you check for NULL returns?
-
+    if(push(kpage, &ofs, &null, sizeof(&null)) == NULL)
+       return false;
+       
     //##Set the stack pointer. IMPORTANT! Make sure you use the right value here...
     *esp = upage + ofs;
 
     //##If you made it this far, everything seems good, return true
+       return true;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, char ** argv, int argc) 
+setup_stack (void **esp, char * cmd_line) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -517,6 +551,7 @@ setup_stack (void **esp, char ** argv, int argc)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
       {
+	setup_stack_helper(cmd_line, kpage, PHYS_BASE, esp);
         *esp = PHYS_BASE;
 	/*int i = 0;
 	int addresses[argc];
