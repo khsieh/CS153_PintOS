@@ -15,6 +15,8 @@
 #include "threads/thread.h"
 #include "userprog/process.h"
 
+struct lock filesys_lock;
+
 static void syscall_handler (struct intr_frame *);
 
 struct process_file
@@ -29,7 +31,7 @@ struct file* process_get_file(int fd);
 
 static void syscall_handler(struct intr_frame *);
 int user_to_kernel_ptr(const void *vaddr);
-void get_arg(struct intr_fram *f, int *arg, int n);
+void get_arg(struct intr_frame *f, int *arg, int n);
 void check_valid_ptr(const void * vaddr);
 void check_valid_buffer(void * buffer, unsigned size);
 
@@ -87,13 +89,13 @@ int write(int fd, const void * buffer, unsigned size)
 	return -1;
     }
     int bytes = file_write(f, buffer, size);
-    lock-release(&filesys_lock);
+    lock_release(&filesys_lock);
     return bytes;
 }
 
 void check_valid_ptr(const void * vaddr)
 {
-    if(!is_user_vaddr(varrd) || vaddr < ((void *) 0x08048000))
+    if(!is_user_vaddr(vaddr) || vaddr < ((void *) 0x08048000))
     {
 	exit(-1);
     }
@@ -123,10 +125,12 @@ void get_arg(struct intr_frame *f, int *arg, int n)
 void check_valid_buffer (void *buffer, unsigned size)
 {
     char * local_buffer = (char *) buffer;
-    for(int i = 0; i < size; i++)
+    int i = 0;
+    while( i < size )
     {
 	check_valid_ptr((const void*) local_buffer);
 	local_buffer++;
+	i++;
     }
 }
 
