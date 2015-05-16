@@ -161,11 +161,11 @@ pid_t exec (const char *cmd_line)
   pid_t pid = process_execute (cmd_line);
   struct child_process* cp = get_child_process(pid);
   ASSERT(cp);
-  while( cp->load == NOT_LOADED){
+  while( cp->load == 0){
     barrier();
   }
-  if(cp->load == LOAD_FAIL){
-    return ERROR;
+  if(cp->load == 2){
+    return -1;
   }
   return pid;
 }
@@ -179,6 +179,62 @@ bool create (const char *file, unsigned initial_size){
   bool success = filesys_create(file, initial_size);
   lock_release(&filesys_lock);
   return success;
+}
+
+bool remove (const char *file)
+{
+  lock_acquire(&filesys_lock);
+  bool success = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return success;
+}
+
+int open (const char *file)
+{
+  lock_acquire(&filesys_lock);
+  struct file *f = filesys_open(file);
+  if(!f){
+    lock_release(&filesys_lock);
+    return -1;
+  }
+  int fd = process_add_file(f);
+  lock_release(&filesys_lock);
+  return fd;
+}
+
+int filesize(int fd)
+{
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+  if(!f){
+    lock_release(&filesys_lock);
+    return -1;
+  }
+  int size = file_length(f);
+  lock_release(&filesys_lock);
+  return size;
+}
+
+int read (int fd, void *buffer, unsigned size)
+{
+  if(fd == STDIN_FILENO){
+    unsigned i = 0;
+    uint8_t* local_buffer = (uint8_t *) buffer;
+    while ( i < size){
+      local_buffer[i] = input_getc();
+      i++;
+    }
+    return size;
+  }
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+  if(!f){
+    lock_release(&filesys_lock);
+    return -1;
+  }
+  int file_bytes = file_read(f,buffer, size);
+  lock_release(&filesys_lock);
+  return file_bytes;
 }
 
 int write(int fd, const void * buffer, unsigned size)
@@ -198,6 +254,38 @@ int write(int fd, const void * buffer, unsigned size)
     int bytes = file_write(f, buffer, size);
     lock_release(&filesys_lock);
     return bytes;
+}
+
+void seek (int fd, unsigned position)
+{
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+  if(!f){
+    lock_release(&filesys_lock);
+    return;
+  }
+  file_seek(f,position);
+  lock_release(&filesys_lock);
+}
+
+unsigned tell (int fd)
+{
+  lock_acquire(&filesys_lock);
+  struct file *f = process_get_file(fd);
+  if(!f){
+    lock_release(&filesys_lock);
+    return -1;
+  }
+  off_t offset = file_tell(f);
+  lock_release(&filesys_lock);
+  return offset;
+}
+
+void close(int fd)
+{
+  lock_acquire(&filesys_lock);
+  process_close_file(fd);
+  lock_release(&filesys_lock);
 }
 
 void check_valid_ptr(const void * vaddr)

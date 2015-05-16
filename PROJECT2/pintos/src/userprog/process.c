@@ -20,7 +20,7 @@
 #include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
-static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static bool load (const char *cmdline, void (**eip) (void), void **esp, char ** save_ptr);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -63,7 +63,7 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  success = load (file_name, &if_.eip, &if_.esp, &ptr);
   if(success)
       thread_current() -> cp -> load = 0;
   else
@@ -213,7 +213,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp, char * cmd_line);
+static bool setup_stack (void **esp, const char * file_name, char ** save_ptr);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -224,7 +224,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name, void (**eip) (void), void **esp, char ** save_ptr) 
 {
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -329,7 +329,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, cmd_line))
+  if (!setup_stack (esp, file_name, save_ptr))
     goto done;
 
   /* Start address. */
@@ -540,7 +540,7 @@ static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp, char * cmd_line) 
+setup_stack (void **esp, const char *  file_name, char ** save_ptr) 
 {
   uint8_t *kpage;
   bool success = false;
@@ -549,43 +549,62 @@ setup_stack (void **esp, char * cmd_line)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-      {
-	setup_stack_helper(cmd_line, kpage, PHYS_BASE, esp);
-        *esp = PHYS_BASE;
-	/*int i = 0;
-	int addresses[argc];
-	while(i < argc)
-	{
-	    esp = &args;
-	    addresses[i] = &esp;
-	    esp++;
-	    args--;
-	    i++;
-	}
-
-	uint32_t * nullptr = NULL;
-	esp = nullptr;
-	esp++;
-	
-	i = 0;
-	while(i < argc)
-	{
-	    esp = addresses[i];
-	    esp++;
-	    i++;
-	}
-	
-	esp = &args;
-	esp++;
-	esp = argc;
-	esp++;
-	esp = NULL;*/
+      if (success){
+	*esp = PHYS_BASE;
       }
-      else
-        palloc_free_page (kpage);
+      else{
+	palloc_free_page(kpage);
+	return success;
+      }
     }
+  
+  char *token;
+  char **argv = malloc( 2 * sizeof(char*) );
+  int i, argc = 0;
+  int argv_size = 2;
+
+  token = (char *) file_name;
+  while(token != NULL){
+    *esp -= strlen(token) +1;
+    argv[argc] = *esp;
+    argc++;
+    
+    if(argc >= argv_size){
+      argv_size = argv_size *2;
+      argv = realloc(argv, argv_size*sizeof(char *));
+    }
+    memcpy(*esp, token, strlen(token)+1);
+    token = strtok_r(NULL, " ", save_ptr);
+  }
+  argv[argc] = NULL;
+  
+  i = (size_t) *esp %4;
+  if(i){
+    *esp=i;
+    memcpy(*esp, &argv[argc], i);
+  }
+
+  i = argc;
+  while(i >= 0){
+    *esp -= sizeof(char *);
+    memcpy(*esp, &argv[i], sizeof(char*));
+    i--;
+  }
+  
+  token = *esp;
+  *esp -= sizeof(char **);
+  memcpy (*esp, &token, sizeof(char **));
+
+  *esp -= sizeof(int);
+  memcpy (*esp, &argc, sizeof(int));
+  
+  *esp -= sizeof(void *);
+  memcpy(*esp, &argv[argc], sizeof(void *));
+  
+  free(argv);
   return success;
+  
+
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
