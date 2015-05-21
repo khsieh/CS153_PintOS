@@ -15,6 +15,7 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
@@ -39,6 +40,10 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  //mark
+  char * save_ptr;
+  file_name = strtok_r((char *) file_name, " ", &save_ptr);
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
@@ -54,6 +59,8 @@ start_process (void *file_name_)
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
+
+  
 
   char * ptr;
   file_name = strtok_r(file_name, " ", &ptr);
@@ -99,12 +106,21 @@ process_wait (tid_t child_tid UNUSED)
 {
     //while(1){}
     struct child_process* cp = get_child_process(child_tid);
-    cp->wait = true;
+    /*cp->wait = true;
     while (!cp->exit)
     {
 	//
     }
     int status = cp->status;
+    remove_child_process(cp);*/
+    if(!cp)
+	return -1;
+    if(cp -> wait)
+	return -1;
+    cp -> wait = true;
+    while(!cp -> exit)
+	barrier();
+    int status = cp-> status;
     remove_child_process(cp);
     return status;
 }
@@ -115,6 +131,14 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+
+  //mark
+  process_close_file(-1);
+
+  remove_child_processes();
+
+  if(thread_alive(cur -> parent))
+      cur -> cp -> exit = true;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -239,22 +263,23 @@ load (const char *file_name, void (**eip) (void), void **esp, char ** save_ptr)
     goto done;
   process_activate ();
 
-  char * cmd_line = NULL;
+  /*char * cmd_line = NULL;
   cmd_line = palloc_get_page(0);
   if(cmd_line == NULL)
       return TID_ERROR;
   strlcpy(cmd_line, file_name, PGSIZE);
   char * temp;
-  char * token = strtok_r(cmd_line, " ", &temp);
+  char * token = strtok_r(cmd_line, " ", &temp);*/
 
   /* Open executable file. */
-  file = filesys_open (token);
+  //file = filesys_open(token);
+  file = filesys_open (file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  palloc_free_page(cmd_line);
+  //palloc_free_page(file_name);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -458,7 +483,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
    If successful, returns a pointer to the newly pushed object.
    On failure, returns a null pointer. */
-static void *
+/*static void *
 push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size) 
 {
     size_t padsize = ROUND_UP (size, sizeof (uint32_t));
@@ -535,7 +560,7 @@ static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t 
 
     //##If you made it this far, everything seems good, return true
        return true;
-}
+       }*/
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
@@ -580,7 +605,7 @@ setup_stack (void **esp, const char *  file_name, char ** save_ptr)
   
   i = (size_t) *esp %4;
   if(i){
-    *esp=i;
+    *esp -= i;
     memcpy(*esp, &argv[argc], i);
   }
 

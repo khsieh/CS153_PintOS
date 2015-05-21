@@ -320,7 +320,7 @@ void get_arg(struct intr_frame *f, int *arg, int n)
 void check_valid_buffer (void *buffer, unsigned size)
 {
     char * local_buffer = (char *) buffer;
-    int i = 0;
+    unsigned i = 0;
     while( i < size )
     {
 	check_valid_ptr((const void*) local_buffer);
@@ -353,6 +353,7 @@ struct file * process_get_file(int fd)
 	    return pf -> file;
 	}
     }
+    return NULL;
 }
 
 struct child_process * add_child_process(int pid)
