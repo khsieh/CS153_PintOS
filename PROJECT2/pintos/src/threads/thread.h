@@ -101,7 +101,6 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
 
-      //mark
       struct list file_list;
       int fd;
 

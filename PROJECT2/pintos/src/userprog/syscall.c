@@ -46,8 +46,21 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+    //unsigned callNum;
     int arg[3];
+    //int numOfArgs;
+
     check_valid_ptr((const void *) f -> esp);
+
+    /*switch(* (int *) f->esp)
+    {
+    case SYS_WRITE;
+	copy_in(&callNum, f-> esp, sizeof(callNum));
+	numOfArgs = 3;
+	copy_in(args, (uint32_t *) f->esp + 1, size of *args * numOfArgs);
+	f->eax = desired_sys_call_fun(args[0], args[1], args[2]);
+	}*/
+
     switch(* (int *) f -> esp)
     {
     case SYS_WRITE:
@@ -80,7 +93,7 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_WAIT:
       {
 	get_arg(f,&arg[0],1);
-	f->eax=wait(arg[0]);
+	f->eax = wait(arg[0]);
 	break;
       }
     case SYS_EXEC:
@@ -136,9 +149,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 	break;
       }
     }
-
-//printf ("system call!\n");
-//thread_exit ();
 }
 
 void halt (void){
@@ -161,9 +171,9 @@ pid_t exec (const char *cmd_line)
   pid_t pid = process_execute (cmd_line);
   struct child_process* cp = get_child_process(pid);
   ASSERT(cp);
-  while( cp->load == 0){
+  /*while( cp->load == 0){
     barrier();
-  }
+    }*/
   if(cp->load == 2){
     return -1;
   }

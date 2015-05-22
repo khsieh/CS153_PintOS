@@ -206,7 +206,6 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
-  //mark
   t -> parent = thread_tid();
   struct child_process *cp = add_child_process(t -> tid);
   t -> cp = cp;
@@ -476,7 +475,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
-  //mark
   list_init(&t -> file_list);
   t -> fd = 2;
   

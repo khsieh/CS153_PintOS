@@ -60,8 +60,6 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
-  
-
   char * ptr;
   file_name = strtok_r(file_name, " ", &ptr);
 
@@ -104,15 +102,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-    //while(1){}
     struct child_process* cp = get_child_process(child_tid);
-    /*cp->wait = true;
-    while (!cp->exit)
-    {
-	//
-    }
-    int status = cp->status;
-    remove_child_process(cp);*/
     if(!cp)
 	return -1;
     if(cp -> wait)
@@ -263,23 +253,13 @@ load (const char *file_name, void (**eip) (void), void **esp, char ** save_ptr)
     goto done;
   process_activate ();
 
-  /*char * cmd_line = NULL;
-  cmd_line = palloc_get_page(0);
-  if(cmd_line == NULL)
-      return TID_ERROR;
-  strlcpy(cmd_line, file_name, PGSIZE);
-  char * temp;
-  char * token = strtok_r(cmd_line, " ", &temp);*/
-
   /* Open executable file. */
-  //file = filesys_open(token);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
-  //palloc_free_page(file_name);
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -499,68 +479,74 @@ push (uint8_t *kpage, size_t *ofs, const void *buf, size_t size)
     return kpage + *ofs + (padsize - size);
 }
 
-static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t * upage, void ** esp) 
+static bool setup_stack_helper (const char * cmd_line, uint8_t * kpage, uint8_t * upage, void ** esp, char ** save_ptr) 
 {
     size_t ofs = PGSIZE; //##Used in push!
     char * const null = NULL; //##Used for pushing nulls
-    char *ptr; //##strtok_r usage
+    //char *ptr; //##strtok_r usage
     //##Probably need some other variables here as well...
     char * arg;
     int argc = 0;
+    char ** argv = malloc(2 * sizeof(char *));
+    int argv_size = 2;
 
-    char * my_cmd_line = NULL;
-    strlcpy(my_cmd_line, cmd_line, PGSIZE);
+    char * test = "args-none";
+    argv[0] = push(kpage, &ofs, &test, sizeof(test));
+    push(kpage, &ofs, &null, sizeof(null));
+    push(kpage, &ofs, &argv[0], sizeof(argv[0]));
+    argc = 1;
+    push(kpage, &ofs, &argc, sizeof(argc));
+    push(kpage, &ofs, &null, sizeof(null));
 
-    char *rev_args = my_cmd_line, *s = my_cmd_line + strlen(my_cmd_line) - 1;
-    while (rev_args < s) {
-        char tmp = *rev_args;
-        *rev_args++ = *s;
-        *s-- = tmp;
-    }
-
-    char * rev_args_save = rev_args;
-
-    
     //##Parse and put in command line arguments, push each value
-    for(arg = strtok_r (rev_args, " <>", &ptr); arg != NULL;
-	arg = strtok_r (NULL, " <>", &ptr))
+    for(arg = (char *) cmd_line; arg != NULL;
+	arg = strtok_r (NULL, " ", save_ptr))
     {
-	argc++;
     //##if any push() returns NULL, return false
-	if(push(kpage, &ofs, arg, strlen(arg)) == NULL)
+	argv[argc] = push(kpage, &ofs, &arg, sizeof(arg));
+	if(argv[argc] == NULL)
 	   return false;
+	argc++;
+	if(argc >= argv_size)
+	{
+	    argv_size *= 2;
+	    argv = realloc(argv, argv_size * sizeof(char *));
+	}
     }
 
     //##push() a null (more precisely &null).
     //##if push returned NULL, return false
-    if(push(kpage, &ofs, &null, sizeof(&null)) == NULL)
+    if(push(kpage, &ofs, &null, sizeof(NULL)) == NULL)
        return false;
 
     //##Push argv addresses (i.e. for the cmd_line added above) in reverse order
     //##See the stack example on documentation for what "reversed" means
-    rev_args = rev_args_save;
-    for(arg = strtok_r (rev_args, " <>", &ptr); arg != NULL;
-	arg = strtok_r (NULL, " <>", &ptr))
+    int i;
+    for(i = argc; i >= 0; i++)
     {
-	if(push(kpage, &ofs, arg, strlen(arg)) == NULL)
+	if(push(kpage, &ofs, &argv[i], sizeof(&argv[i])) == NULL)
 	    return false;
     }
 
+    //##Push argv
+	//if(push(kpage, &ofs, &argv, sizeof(argv)) == NULL)
+	//return false;
+
     //##Push argc, how can we determine argc?
-    if(push(kpage, &ofs, &argc, sizeof(argc)) == NULL)
+	if(push(kpage, &ofs, &argc, sizeof(argc)) == NULL)
 	return false;
     
     //##Push &null
     //##Should you check for NULL returns?
-    if(push(kpage, &ofs, &null, sizeof(&null)) == NULL)
-       return false;
+	if(push(kpage, &ofs, &null, sizeof(NULL)) == NULL)
+	return false;
        
     //##Set the stack pointer. IMPORTANT! Make sure you use the right value here...
     *esp = upage + ofs;
 
     //##If you made it this far, everything seems good, return true
        return true;
-       }*/
+}*/
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
@@ -573,15 +559,22 @@ setup_stack (void **esp, const char *  file_name, char ** save_ptr)
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+	uint8_t *upage = ( (uint8_t *) PHYS_BASE ) - PGSIZE;
+	//success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+	success = install_page(upage, kpage, true);
       if (success){
 	*esp = PHYS_BASE;
+	//success = setup_stack_helper(file_name, kpage, upage, esp, save_ptr);
       }
       else{
 	palloc_free_page(kpage);
 	return success;
       }
     }
+
+  /*printf("\n");
+  hex_dump(*esp, *esp, (PHYS_BASE-*esp),true);
+  *esp = PHYS_BASE - 12;*/
   
   char *token;
   char **argv = malloc( 2 * sizeof(char*) );
@@ -611,9 +604,9 @@ setup_stack (void **esp, const char *  file_name, char ** save_ptr)
 
   i = argc;
   while(i >= 0){
-    *esp -= sizeof(char *);
-    memcpy(*esp, &argv[i], sizeof(char*));
-    i--;
+      *esp -= sizeof(char *);
+      memcpy(*esp, &argv[i], sizeof(char*));
+      i--;
   }
   
   token = *esp;
@@ -627,9 +620,8 @@ setup_stack (void **esp, const char *  file_name, char ** save_ptr)
   memcpy(*esp, &argv[argc], sizeof(void *));
   
   free(argv);
-  return success;
-  
 
+  return success;
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
